@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.integrate import solve_ivp
+
 import matplotlib.pyplot as plt
 from derivative import dxdt
 from tqdm import tqdm
@@ -11,8 +12,10 @@ np.random.seed(0)
 # set global solve_ivp keyword arguments
 solve_ivp_kwargs = {}
 solve_ivp_kwargs['method'] = 'LSODA'
-solve_ivp_kwargs['rtol'] = 1e-12
-solve_ivp_kwargs['atol'] = 1e-12
+solve_ivp_kwargs['rtol'] = 1e-6
+solve_ivp_kwargs['atol'] = 1e-6
+# solve_ivp_kwargs['rtol'] = 1e-12
+# solve_ivp_kwargs['atol'] = 1e-12
 
 
 # generate Lotka-Volterra right-hand side functions
@@ -33,7 +36,7 @@ def generate_training_data(rhs, x0, t_eval):
 
 
 # generate noisy training data
-def add_noise_to_data(x, noise_level, noise_mask=None):
+def add_noise_to_data(x, noise_level):
     # set random seed for reproducibility
     np.random.seed(0)
 
@@ -42,14 +45,10 @@ def add_noise_to_data(x, noise_level, noise_mask=None):
     
     # calculate the standard deviation of the noise to add
     std = rms * noise_level
-
-    # if noise_mask is None, apply noise to all data points
-    if noise_mask is None:
-        noise_mask = np.ones(x.shape)
     
     # generate appropriate noise by scaling samples from a standard normal
     # NOTE: because "std" is a vector it gets broadcast to the shape of the standard normal noise
-    noise = (std * np.random.standard_normal(x.shape)) * noise_mask
+    noise = (std * np.random.standard_normal(x.shape))
     
     return x + noise
 
@@ -79,3 +78,9 @@ def generate_model_prediction(model, x0, t_eval):
 def relative_trajectory_error(x_train, x_pred):
     assert x_train.shape == x_pred.shape
     return np.sum((x_train - x_pred)**2) / np.sum(x_train**2)
+
+
+# calculate the relative error between the true and predicted coefficients using the frobenius norm
+def relative_coefficient_error(true_coeffs, pred_coeffs):
+    assert true_coeffs.shape == pred_coeffs.shape
+    return np.sum((true_coeffs - pred_coeffs)**2) / np.sum(true_coeffs**2)
