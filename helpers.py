@@ -84,3 +84,15 @@ def relative_trajectory_error(x_train, x_pred):
 def relative_coefficient_error(true_coeffs, pred_coeffs):
     assert true_coeffs.shape == pred_coeffs.shape
     return np.sum((true_coeffs - pred_coeffs)**2) / np.sum(true_coeffs**2)
+
+
+def relative_squared_error(x_true, x_pred):
+    assert x_true.shape == x_pred.shape
+    return np.sum((x_true - x_pred)**2) / np.sum(x_true**2)
+
+
+# calculate the true derivative of the state variables give some right-hand side function and a trajectory
+def generate_true_derivative(rhs, x):
+    # NOTE: x.shape == (n_state_vars, n_samples)
+    dxdt_true = np.array([rhs(0, x[:, i]) for i in range(x.shape[1])]).T
+    return dxdt_true
