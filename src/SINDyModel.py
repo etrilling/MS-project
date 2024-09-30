@@ -9,9 +9,14 @@ def make_poly_library(n_state_vars, poly_order):
         return lambda x: np.prod(np.power(x, power_tuple), axis=1)
     
     # get all possible power tuples up to poly_order
-    power_tuples = [power_tuple for power_tuple in itertools.product(range(poly_order + 1), repeat=n_state_vars)
-                    if sum(power_tuple) <= poly_order]
-
+    # this should be sorted so that all n-th order terms come before all (n+1)-th order terms
+    # and within each order, the terms are sorted lexicographically by the power of the state variables
+    power_tuples = []
+    power_tuples.append((0,) * n_state_vars) # add the constant term
+    for n in range(1, poly_order + 1):
+        power_tuples += sorted([p for p in itertools.product(range(n + 1), repeat=n_state_vars) if sum(p) == n], reverse=True)
+    
+    # create the library functions and their names
     library_functions = []
     library_names = []
     for power_tuple in power_tuples:
@@ -32,12 +37,7 @@ def make_poly_library(n_state_vars, poly_order):
         library_names.append(function_name)
     
     library_names[0] = "1" # replace the first name with a constant term (otherwise it will be an empty string)
-
-    # sort the library functions and names by name
-    sorted_pairs = sorted(zip(library_names, library_functions), key=lambda x: x[0])
-    library_names = [x[0] for x in sorted_pairs]
-    library_functions = [x[1] for x in sorted_pairs]
-
+    
     return library_functions, library_names
 
 
@@ -81,16 +81,16 @@ class SINDyModel:
         self.include_sin = include_sin
         self.include_cos = include_cos
 
-        # add functions to the feature library
-        self.feature_library = []
-        self.feature_library_names = []
+        # add functions to the function library
+        self.function_library = []
+        self.function_library_names = []
         library_functions, library_names = make_poly_library(self.n_state_vars, self.poly_order)
-        self.feature_library += library_functions
-        self.feature_library_names += library_names
+        self.function_library += library_functions
+        self.function_library_names += library_names
         library_functions, library_names = make_fourier_library(self.n_state_vars, self.n_frequencies,
                                                                 self.include_sin, self.include_cos)
-        self.feature_library += library_functions
-        self.feature_library_names += library_names
+        self.function_library += library_functions
+        self.function_library_names += library_names
 
     
     def fit(self, x, x_dot, max_itterations=20):
@@ -98,13 +98,12 @@ class SINDyModel:
         assert x.shape[0] == self.n_state_vars
         assert x.shape == x_dot.shape
 
-        # transpose the data to the form (rows, cols) == (n_samples, n_features)
+        # transpose the data to the form (rows, cols) == (n_samples, n_functions)
         # NOTE: it is just easier to work with the data in this form here
         x = x.T
         x_dot = x_dot.T
-
-        # Theta_ps = ps.PolynomialLibrary(degree=5).fit(x).transform(x)
-        Theta = np.column_stack([f(x) for f in self.feature_library])
+        
+        Theta = np.column_stack([f(x) for f in self.function_library])
 
         Xi = np.linalg.lstsq(Theta, x_dot, rcond=None)[0]
 
@@ -141,7 +140,7 @@ class SINDyModel:
 
         # predict the time derivatives of the state variables
         x = x.T
-        Theta = np.column_stack([f(x) for f in self.feature_library])
+        Theta = np.column_stack([f(x) for f in self.function_library])
         x_dot = Theta @ self.Xi
         return x_dot.T
     
@@ -161,5 +160,5 @@ class SINDyModel:
             for j in range(self.Xi.shape[0]):
                 if self.Xi[j, i] != 0:
                     print("+ ", end="")
-                    print(f"{self.Xi[j, i]:.{decimals}f} {self.feature_library_names[j]}", end=" ")
+                    print(f"{self.Xi[j, i]:.{decimals}f} {self.function_library_names[j]}", end=" ")
             print()

@@ -1,13 +1,6 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 
-import matplotlib.pyplot as plt
-from derivative import dxdt
-from tqdm import tqdm
-
-
-# set random seed for reproducibility
-np.random.seed(0)
 
 # set global solve_ivp keyword arguments
 solve_ivp_kwargs = {}
@@ -16,15 +9,6 @@ solve_ivp_kwargs['rtol'] = 1e-6
 solve_ivp_kwargs['atol'] = 1e-6
 # solve_ivp_kwargs['rtol'] = 1e-12
 # solve_ivp_kwargs['atol'] = 1e-12
-
-
-# generate Lotka-Volterra right-hand side functions
-def generate_lotka_volterra_rhs(a, b, c, d):
-    def lotka_volterra_rhs(t, x):
-        # we expect x to be a 2D array with shape (rows, cols) == (2, n_samples)
-        assert x.shape[0] == 2
-        return np.array([a*x[0] - b*x[0]*x[1], -c*x[1] + d*x[0]*x[1]])
-    return lotka_volterra_rhs
 
 
 # generate training data for an arbitrary right-hand side function
@@ -74,21 +58,18 @@ def generate_model_prediction(model, x0, t_eval):
     return ivp_result.y
 
 
+# calculate the relative error between the true and predicted values using the frobenius norm
+def relative_frobenius_error(x_true, x_pred):
+    assert x_true.shape == x_pred.shape
+    return np.linalg.norm(x_true - x_pred, ord='fro') / np.linalg.norm(x_true, ord='fro')
+
 # calculate the relative error between the true and predicted trajectories using the frobenius norm
 def relative_trajectory_error(x_train, x_pred):
-    assert x_train.shape == x_pred.shape
-    return np.sum((x_train - x_pred)**2) / np.sum(x_train**2)
-
+    return relative_frobenius_error(x_train, x_pred)
 
 # calculate the relative error between the true and predicted coefficients using the frobenius norm
 def relative_coefficient_error(true_coeffs, pred_coeffs):
-    assert true_coeffs.shape == pred_coeffs.shape
-    return np.sum((true_coeffs - pred_coeffs)**2) / np.sum(true_coeffs**2)
-
-
-def relative_squared_error(x_true, x_pred):
-    assert x_true.shape == x_pred.shape
-    return np.sum((x_true - x_pred)**2) / np.sum(x_true**2)
+    return relative_frobenius_error(true_coeffs, pred_coeffs)
 
 
 # calculate the true derivative of the state variables give some right-hand side function and a trajectory
