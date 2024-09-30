@@ -3,12 +3,18 @@ from scipy.integrate import solve_ivp
 
 
 # set global solve_ivp keyword arguments
+# NOTES
+# - RK45 stalls when it's run on some SINDy models and Radau is very slow but produces the same results as LSODA
+#   when Radau fails on the same problems LSODA does, the status message is
+#   "Required step size is less than spacing between numbers." which is more informative than what LSODA gives
+# - using the default tolerances (for LSODA at least) produces pretty bad results. but there doesn't seem to be a huge
+#   difference between 1e-6 and 1e-12.
 solve_ivp_kwargs = {}
 solve_ivp_kwargs['method'] = 'LSODA'
-solve_ivp_kwargs['rtol'] = 1e-6
-solve_ivp_kwargs['atol'] = 1e-6
 # solve_ivp_kwargs['rtol'] = 1e-12
 # solve_ivp_kwargs['atol'] = 1e-12
+solve_ivp_kwargs['rtol'] = 1e-6
+solve_ivp_kwargs['atol'] = 1e-6
 
 
 # generate training data for an arbitrary right-hand side function
@@ -50,6 +56,8 @@ def generate_model_prediction(model, x0, t_eval):
     try:
         ivp_result = solve_ivp(model_rhs, t_span, x0, t_eval=t_eval, **solve_ivp_kwargs)
     except ValueError:
+        # NOTE: it's possible this only happens for non-LSODA methods
+        raise ValueError('hey Elliot, come check this out!')
         return None
     
     if ivp_result.success is False:
@@ -70,10 +78,3 @@ def relative_trajectory_error(x_train, x_pred):
 # calculate the relative error between the true and predicted coefficients using the frobenius norm
 def relative_coefficient_error(true_coeffs, pred_coeffs):
     return relative_frobenius_error(true_coeffs, pred_coeffs)
-
-
-# calculate the true derivative of the state variables give some right-hand side function and a trajectory
-def generate_true_derivative(rhs, x):
-    # NOTE: x.shape == (n_state_vars, n_samples)
-    dxdt_true = np.array([rhs(0, x[:, i]) for i in range(x.shape[1])]).T
-    return dxdt_true

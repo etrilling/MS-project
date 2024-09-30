@@ -73,13 +73,11 @@ def make_fourier_library(n_state_vars, n_frequencies, include_sin=True, include_
 
 
 class SINDyModel:
-    def __init__(self, n_state_vars, threshold, poly_order, n_frequencies=0, include_sin=True, include_cos=True):
+    def __init__(self, n_state_vars, threshold, poly_order=5, n_frequencies=0):
         self.n_state_vars = n_state_vars
         self.threshold = threshold
         self.poly_order = poly_order
         self.n_frequencies = n_frequencies
-        self.include_sin = include_sin
-        self.include_cos = include_cos
 
         # add functions to the function library
         self.function_library = []
@@ -87,8 +85,7 @@ class SINDyModel:
         library_functions, library_names = make_poly_library(self.n_state_vars, self.poly_order)
         self.function_library += library_functions
         self.function_library_names += library_names
-        library_functions, library_names = make_fourier_library(self.n_state_vars, self.n_frequencies,
-                                                                self.include_sin, self.include_cos)
+        library_functions, library_names = make_fourier_library(self.n_state_vars, self.n_frequencies)
         self.function_library += library_functions
         self.function_library_names += library_names
 
