@@ -14,7 +14,8 @@ def make_poly_library(n_state_vars, poly_order):
     power_tuples = []
     power_tuples.append((0,) * n_state_vars) # add the constant term
     for n in range(1, poly_order + 1):
-        power_tuples += sorted([p for p in itertools.product(range(n + 1), repeat=n_state_vars) if sum(p) == n], reverse=True)
+        power_tuples += sorted([p for p in itertools.product(range(n + 1), repeat=n_state_vars) if sum(p) == n],
+                               reverse=True)
     
     # create the library functions and their names
     library_functions = []
