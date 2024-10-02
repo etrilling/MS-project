@@ -144,8 +144,10 @@ def plot_heatmaps(experiment_config, results):
                 raise ValueError("Only two lists are allowed")
     
     # generate the labels for the heatmap using the list values
-    yticklabels = [f"{val:.5f}\n{i}" for i, val in list(enumerate(list1))[::-1]] # row labels
-    xticklabels = [f"{val:.5f}\n{i}" for i, val in enumerate(list2)] # column labels
+    yticklabels = [f"{val:.3f}\n{i}" if type(val) is float else f"{val}\n{i}"
+                   for i, val in list(enumerate(list1))[::-1]] # row labels
+    xticklabels = [f"{val:.5f}\n{i}" if type(val) is float else f"{val}\n{i}"
+                   for i, val in enumerate(list2)] # column labels
 
     results = results[::-1] # flip the rows of the results so the smallest value is at the bottom of the heatmap
 
