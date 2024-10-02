@@ -1,0 +1,224 @@
+from src.helpers import *
+from src.SINDyModel import SINDyModel
+from tqdm import tqdm
+
+from matplotlib import pyplot as plt
+import seaborn as sns
+
+
+dynamic_keys = ['x0', 'noise_level', 't_eval_train', 'dt', 't_span', 'threshold']
+
+
+def run_experiment(experiment_config):
+    # extract the parts of the experiment configuration that don't change
+    rhs = experiment_config['rhs']
+    derivative_approximation = experiment_config['derivative_approximation']
+    t_eval_test = experiment_config['t_eval_test']
+
+    # figure out which two parameters are lists
+    list1 = None
+    list2 = None
+    for key in experiment_config.keys():
+        # skip the keys that we are not interested in
+        if key not in dynamic_keys:
+            continue
+
+        # check if the key is a list
+        if type(experiment_config[key]) is list:
+            if list1 is None:
+                list1 = experiment_config[key]
+                print(f'rows are {key}. there are {len(list1)} rows.')
+            elif list2 is None:
+                list2 = experiment_config[key]
+                print(f'columns are {key}. there are {len(list2)} columns.')
+            else:
+                raise ValueError("Only two lists are allowed")
+    
+    # make sure we found both two lists
+    if list1 is None or list2 is None:
+        raise ValueError("You need to specify two lists in the experiment configuration")
+
+    # make a results matrix
+    # the first list (list1) will decide be the number of rows and
+    # the second list (list2) will decide the number of columns
+    results = [[None for _ in range(len(list2))] for _ in range(len(list1))]
+
+    # iterate over the lists
+    for i in range(len(list1)): # iterate over the rows
+        print(f'step {i + 1} of {len(list1)}')
+
+        for j in tqdm(range(len(list2))): # iterate over the columns
+            result = {}
+
+            # iterate over the experiment configuration and set the values for this iteration
+            for key in experiment_config.keys():
+                # skip the keys that we are not interested in
+                if key not in dynamic_keys:
+                    continue
+
+                # if the key is a list, we need to get the value for this iteration
+                if type(experiment_config[key]) is list:
+                    idx = i if experiment_config[key] is list1 else j
+                    result[key] = experiment_config[key][idx]
+                else:
+                    result[key] = experiment_config[key]
+            
+            # set local variables
+            x0 = result['x0']
+            noise_level = result['noise_level']
+            t_eval_train = result['t_eval_train']
+            dt = result['dt']
+            t_span = result['t_span']
+            threshold = result['threshold']
+
+            # calculate t_eval_train if it is None
+            if t_eval_train is None:
+                if dt is None or t_span is None:
+                    raise ValueError("You need to specify either t_eval_train or dt and t_span")
+                
+                t_eval_train = np.arange(t_span[0], t_span[1] + dt, dt)
+                result['t_eval_train'] = t_eval_train
+            else:
+                if dt is not None or t_span is not None:
+                    raise ValueError("You can't specify both t_eval_train and dt or t_span")
+
+            # generate training data
+            x_train = generate_training_data(rhs, x0, t_eval_train)
+            result["x_train"] = x_train
+            
+            # generate noisy data
+            x_train_noisy = add_noise_to_data(x_train, noise_level)
+            result["x_train_noisy"] = x_train_noisy
+
+            # generate the derivative of the noisy data using finite difference
+            x_dot_approx = derivative_approximation(x_train_noisy, t_eval_train)
+            result["x_dot_approx"] = x_dot_approx
+
+            # generate the true derivative of the data
+            # this is only used for comparison and is not used in the SINDy model
+            x_dot_true = rhs(0, x_train)
+            result["x_dot_true"] = x_dot_true
+            
+            # create and fit a SINDy model
+            model = SINDyModel(n_state_vars=len(x0), threshold=threshold, poly_order=5)
+            model.fit(x_train_noisy, x_dot_approx)
+            result["model"] = model
+
+            # generate the model prediction
+            x_pred = generate_model_prediction(model, x0, t_eval_test)
+            result["x_pred"] = x_pred
+
+            # generate the true test data
+            x_test = generate_training_data(rhs, x0, t_eval_test)
+            result["x_test"] = x_test
+            
+            # store the data entry
+            results[i][j] = result
+
+    return results
+
+
+
+def plot_heatmaps(experiment_config, results):
+    # figure out which parameters are lists
+    list1 = None
+    list1_name = None
+    list2 = None
+    list2_name = None
+    for key in experiment_config.keys():
+        # skip the keys that are not lists
+        if key not in dynamic_keys:
+            continue
+
+        # check if the key is a list
+        if type(experiment_config[key]) is list:
+            if list1 is None:
+                list1 = experiment_config[key]
+                list1_name = key
+                print(f'rows are {key}. there are {len(list1)} rows.')
+            elif list2 is None:
+                list2 = experiment_config[key]
+                list2_name = key
+                print(f'columns are {key}. there are {len(list2)} columns.')
+            else:
+                raise ValueError("Only two lists are allowed")
+    
+    # generate the labels for the heatmap using the list values
+    yticklabels = [f"{val:.5f}\n{i}" for i, val in list(enumerate(list1))[::-1]] # row labels
+    xticklabels = [f"{val:.5f}\n{i}" for i, val in enumerate(list2)] # column labels
+
+    results = results[::-1] # flip the rows of the results so the smallest value is at the bottom of the heatmap
+
+    # extract the true coefficients from the experiment configuration
+    true_coeffs = experiment_config['true_coeffs']
+
+    # make a matrix of the relative coefficient errors
+    rce_mtx = np.zeros((len(list1), len(list2)))
+    
+    for i in range(len(list1)):
+        for j in range(len(list2)):
+            model = results[i][j]["model"]
+            rce = relative_coefficient_error(true_coeffs, model.Xi)
+            rce_mtx[i, j] = rce
+    
+
+    # make a matrix of the relative trajectory errors
+    rte_mtx = np.zeros((len(list1), len(list2)))
+
+    for i in range(len(list1)):
+        for j in range(len(list2)):
+            x_test = results[i][j]["x_test"]
+            x_pred = results[i][j]["x_pred"]
+            
+            # if the model prediction is "None", set the rte to np.nan
+            if x_pred is None:
+                rte = np.nan
+            else:
+                rte = relative_trajectory_error(x_test, x_pred)
+            
+            rte_mtx[i, j] = rte
+    
+
+    # draw the plots
+    sns.set_theme(font_scale=0.75)
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = sns.heatmap(rce_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=2)
+    ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Coefficient Error")
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=2)
+    ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Trajectory Error")
+
+
+
+def display_single_result(experiment_config, results, col, row, keys_to_display=['x_test', 'x_pred']):
+    result = results[row][col]
+
+    # print the model
+    model = result['model']
+    model.print()
+
+    # get the number of state variables
+    n_state_vars = result['x_test'].shape[0]
+
+    fig, axs = plt.subplots(1, n_state_vars, figsize=(16, 6), sharex='col', sharey='row')
+
+    for key in keys_to_display:
+        # figure out which time points to use
+        if key in ('x_train', 'x_train_noisy', 'x_dot_approx', 'x_dot_true'):
+            t_eval = result['t_eval_train']
+        if key in ('x_test', 'x_pred'):
+            t_eval = experiment_config['t_eval_test']
+        
+        # extract the data
+        x = result[key]
+
+        # plot each state variable
+        for sv in range(n_state_vars):
+            axs[sv].plot(t_eval, x[sv], ".-", label=key)
+
+            # set labels
+            axs[sv].set_xlabel("t")
+            axs[sv].set_ylabel(f"$x_{sv}$")
+            axs[sv].legend()

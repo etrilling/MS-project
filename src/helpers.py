@@ -68,7 +68,7 @@ def generate_model_prediction(model, x0, t_eval):
     try:
         ode_result = solve_ivp_with_timeout(model_rhs, t_span, x0, t_eval=t_eval, **solve_ivp_kwargs)
     except TimeOutError:
-        print('timeout occurred')
+        print('timeout occurred in solve_ivp_with_timeout')
         return None
     except ValueError:
         # NOTE: it's possible this only happens for non-LSODA methods
