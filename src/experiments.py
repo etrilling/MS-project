@@ -6,10 +6,25 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 
 
-dynamic_keys = ['x0', 'noise_level', 't_eval_train', 'dt', 't_span', 'threshold']
+# define the keys that are allowed in the experiment configuration
+# NOTE: "true_coeffs" is not used in the experiment but having it in the configuration makes generating results easier
+all_keys = ['rhs', 'derivative_approximation', 't_eval_test',
+            'x0', 'noise_level', 't_eval_train', 'dt_train', 't_span_train',
+            'threshold', 'poly_order', 'n_frequencies',
+            'true_coeffs']
+
+# define the keys that can change in the experiment configuration
+dynamic_keys = ['x0', 'noise_level', 't_eval_train', 'dt_train', 't_span_train',
+                'threshold', 'poly_order', 'n_frequencies']
 
 
 def run_experiment(experiment_config):
+    # NOTE: the order of the keys in "experiment_config" is important.
+    #       the first list present will be the rows and the second list will be the columns
+
+    # check that "experiment_config" has exactly the keys we expect
+    assert set(experiment_config.keys()) == set(all_keys)
+
     # extract the parts of the experiment configuration that don't change
     rhs = experiment_config['rhs']
     derivative_approximation = experiment_config['derivative_approximation']
@@ -34,7 +49,7 @@ def run_experiment(experiment_config):
             else:
                 raise ValueError("Only two lists are allowed")
     
-    # make sure we found both two lists
+    # make sure we found two lists
     if list1 is None or list2 is None:
         raise ValueError("You need to specify two lists in the experiment configuration")
 
@@ -58,6 +73,8 @@ def run_experiment(experiment_config):
 
                 # if the key is a list, we need to get the value for this iteration
                 if type(experiment_config[key]) is list:
+                    # figure out which index to use for this list
+                    # we will index list1 by i and list2 by j
                     idx = i if experiment_config[key] is list1 else j
                     result[key] = experiment_config[key][idx]
                 else:
@@ -67,20 +84,22 @@ def run_experiment(experiment_config):
             x0 = result['x0']
             noise_level = result['noise_level']
             t_eval_train = result['t_eval_train']
-            dt = result['dt']
-            t_span = result['t_span']
+            dt_train = result['dt_train']
+            t_span_train = result['t_span_train']
             threshold = result['threshold']
+            poly_order = result['poly_order']
+            n_frequencies = result['n_frequencies']
 
             # calculate t_eval_train if it is None
             if t_eval_train is None:
-                if dt is None or t_span is None:
-                    raise ValueError("You need to specify either t_eval_train or dt and t_span")
+                if dt_train is None or t_span_train is None:
+                    raise ValueError("You need to specify either t_eval_train or (dt_train and t_span_train)")
                 
-                t_eval_train = np.arange(t_span[0], t_span[1] + dt, dt)
+                t_eval_train = np.arange(t_span_train[0], t_span_train[1] + dt_train, dt_train)
                 result['t_eval_train'] = t_eval_train
             else:
-                if dt is not None or t_span is not None:
-                    raise ValueError("You can't specify both t_eval_train and dt or t_span")
+                if dt_train is not None or t_span_train is not None:
+                    raise ValueError("You can't specify both t_eval_train and (dt_train or t_span_train)")
 
             # generate training data
             x_train = generate_training_data(rhs, x0, t_eval_train)
@@ -90,7 +109,7 @@ def run_experiment(experiment_config):
             x_train_noisy = add_noise_to_data(x_train, noise_level)
             result["x_train_noisy"] = x_train_noisy
 
-            # generate the derivative of the noisy data using finite difference
+            # generate a derivative approximation of the noisy data
             x_dot_approx = derivative_approximation(x_train_noisy, t_eval_train)
             result["x_dot_approx"] = x_dot_approx
 
@@ -100,7 +119,8 @@ def run_experiment(experiment_config):
             result["x_dot_true"] = x_dot_true
             
             # create and fit a SINDy model
-            model = SINDyModel(n_state_vars=len(x0), threshold=threshold, poly_order=5)
+            model = SINDyModel(n_state_vars=len(x0), threshold=threshold,
+                               poly_order=poly_order, n_frequencies=n_frequencies)
             model.fit(x_train_noisy, x_dot_approx)
             result["model"] = model
 
@@ -185,11 +205,11 @@ def plot_heatmaps(experiment_config, results):
     sns.set_theme(font_scale=0.75)
 
     fig = plt.figure(figsize=(8, 6))
-    ax = sns.heatmap(rce_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=2)
+    ax = sns.heatmap(rce_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
     ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Coefficient Error")
 
     fig = plt.figure(figsize=(8, 6))
-    ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=2)
+    ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
     ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Trajectory Error")
 
 
@@ -197,7 +217,7 @@ def plot_heatmaps(experiment_config, results):
 def display_single_result(experiment_config, results, col, row, keys_to_display=['x_test', 'x_pred']):
     result = results[row][col]
 
-    # print the model
+    # print the model for this result
     model = result['model']
     model.print()
 

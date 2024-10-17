@@ -1,57 +1,65 @@
 import numpy as np
 
 
+# NOTE: the following code was generated with "o1-preview"
+# TODO: look over this code and make sure you understand it!
+def dxdt_finite_difference_1d(x, t):
+    """
+    Compute the derivative of x with respect to t using:
+    - Second-order accurate central differences in the interior.
+    - First-order accurate one-sided differences at the boundaries.
+    
+    This function matches the behavior of np.gradient(x, t, edge_order=1).
+    
+    Parameters:
+    x (array_like): Array of function values.
+    t (array_like): Array of times or positions corresponding to x.
+    
+    Returns:
+    ndarray: Array of derivative values dx/dt.
+    """
+    x = np.asarray(x, dtype=float)
+    t = np.asarray(t, dtype=float)
+    
+    if x.shape != t.shape:
+        raise ValueError("x and t must have the same shape.")
+    
+    dxdt = np.zeros_like(x)
+    
+    # First point: forward difference
+    dxdt[0] = (x[1] - x[0]) / (t[1] - t[0])
+    
+    # Interior points
+    dt1 = t[1:-1] - t[:-2]    # t_i - t_{i-1}
+    dt2 = t[2:] - t[1:-1]     # t_{i+1} - t_i
+    dx1 = x[1:-1] - x[:-2]    # x_i - x_{i-1}
+    dx2 = x[2:] - x[1:-1]     # x_{i+1} - x_i
+    
+    denom = dt1 + dt2
+    a = dt2 / denom
+    b = dt1 / denom
+    
+    dxdt[1:-1] = a * (dx1 / dt1) + b * (dx2 / dt2)
+    
+    # Last point: backward difference
+    dxdt[-1] = (x[-1] - x[-2]) / (t[-1] - t[-2])
+    
+    return dxdt
+
+
 def dxdt_finite_difference(x, t):
     # NOTE: this gives exactly the same result as "dxdt(x, t, kind="finite_difference", k=1)"
-    # NOTE: see the page "https://numpy.org/doc/stable/reference/generated/numpy.gradient.html" for more information
+    # NOTE: this also gives the same result as "np.gradient(x, t, edge_order=1, axis=1)"
+    #       see the page "https://numpy.org/doc/stable/reference/generated/numpy.gradient.html" for more information
 
-    return np.gradient(x, t, edge_order=1, axis=1)
+    # we will assume that x.shape == (n_state_vars, n_samples)
 
+    dxdt = np.zeros_like(x)
 
-# NOTE: the following code was generated with o1-preview. it should do exactly the same thing as dxdt_finite_difference.
-#       I just need to make sure I understand everything before using it!
-# def dxdt_finite_difference_1d(x, t):
-#     """
-#     Compute the derivative of x with respect to t using:
-#     - Second-order accurate central differences in the interior.
-#     - First-order accurate one-sided differences at the boundaries.
+    for i in range(x.shape[0]):
+        dxdt[i] = dxdt_finite_difference_1d(x[i], t)
     
-#     This function matches the behavior of np.gradient(x, t, edge_order=1).
-    
-#     Parameters:
-#     x (array_like): Array of function values.
-#     t (array_like): Array of times or positions corresponding to x.
-    
-#     Returns:
-#     ndarray: Array of derivative values dx/dt.
-#     """
-#     x = np.asarray(x, dtype=float)
-#     t = np.asarray(t, dtype=float)
-    
-#     if x.shape != t.shape:
-#         raise ValueError("x and t must have the same shape.")
-    
-#     dxdt = np.empty_like(x)
-    
-#     # First point: forward difference
-#     dxdt[0] = (x[1] - x[0]) / (t[1] - t[0])
-    
-#     # Interior points
-#     dt1 = t[1:-1] - t[:-2]    # t_i - t_{i-1}
-#     dt2 = t[2:] - t[1:-1]     # t_{i+1} - t_i
-#     dx1 = x[1:-1] - x[:-2]    # x_i - x_{i-1}
-#     dx2 = x[2:] - x[1:-1]     # x_{i+1} - x_i
-    
-#     denom = dt1 + dt2
-#     a = dt2 / denom
-#     b = dt1 / denom
-    
-#     dxdt[1:-1] = a * (dx1 / dt1) + b * (dx2 / dt2)
-    
-#     # Last point: backward difference
-#     dxdt[-1] = (x[-1] - x[-2]) / (t[-1] - t[-2])
-    
-#     return dxdt
+    return dxdt
 
 
 

@@ -5,8 +5,8 @@ from src.SINDyModel import make_poly_library, make_fourier_library
 
 # generate the true coefficients matrix for some right-hand side function
 # NOTE: this function should only be used within this file as a helper
-def generate_true_coefficients(coefficient_info, poly_order=5, n_frequencies=0):
-    # NOTE: coefficient_info contains info for the RHS of each state variable
+def generate_true_coefficients(coefficient_info, poly_order, n_frequencies):
+    # NOTE: "coefficient_info" contains info for the RHS of each state variable
     #       it is a list of dictionaries where each dictionary has the format
     #       key: function_name, value: coefficient_value
     
@@ -33,6 +33,7 @@ def generate_true_coefficients(coefficient_info, poly_order=5, n_frequencies=0):
     return true_coeffs
 
 
+
 # generate Lotka-Volterra right-hand side functions
 def generate_lotka_volterra_rhs(a, b, c, d):
     def lotka_volterra_rhs(t, x):
@@ -52,6 +53,7 @@ def generate_lotka_volterra_true_coefficients(a, b, c, d, poly_order=5, n_freque
     return true_coefficients
 
 
+
 def generate_van_der_pol_rhs(mu):
     def van_der_pol_rhs(t, x):
         # we expect x to be a 2D array with shape (rows, cols) == (2, n_samples)
@@ -63,6 +65,23 @@ def generate_van_der_pol_rhs(mu):
 def generate_van_der_pol_true_coefficients(mu, poly_order=5, n_frequencies=0):
     coefficient_info = [{'x1': 1}, # RHS for first state variable
                         {'x0': -1, 'x1': mu, 'x0^2 x1': -mu}] # RHS for second state variable
+
+    true_coefficients = generate_true_coefficients(coefficient_info, poly_order, n_frequencies)
+
+    return true_coefficients
+
+
+
+def generate_duffing_oscillator_rhs(delta, alpha, beta):
+    def duffing_oscillator_rhs(t, x):
+        assert x.shape[0] == 2 # we expect x to be a 2D array with shape (rows, cols) == (2, n_samples)
+        return np.array([x[1], -delta*x[1] - alpha*x[0] - beta*x[0]**3])
+
+    return duffing_oscillator_rhs
+
+def generate_duffing_oscillator_true_coefficients(delta, alpha, beta, poly_order=5, n_frequencies=0):
+    coefficient_info = [{'x1': 1}, # RHS for first state variable
+                        {'x1': -delta, 'x0': -alpha, 'x0^3': -beta}] # RHS for second state variable
 
     true_coefficients = generate_true_coefficients(coefficient_info, poly_order, n_frequencies)
 

@@ -20,7 +20,7 @@ solve_ivp_kwargs['atol'] = 1e-6
 
 
 # custom exception for when the time limit is exceeded
-class TimeOutError(Exception):
+class TimeoutError(Exception):
     pass
 
 
@@ -34,7 +34,7 @@ def solve_ivp_with_timeout(fun, t_span, y0, time_limit=10, **kwargs):
         elapsed_time = time.time() - start_time
 
         if elapsed_time > time_limit:
-            raise TimeOutError(f"Time limit of {time_limit} seconds exceeded. Elapsed time: {elapsed_time} seconds.")
+            raise TimeoutError(f"Time limit of {time_limit} seconds exceeded. Elapsed time: {elapsed_time} seconds.")
         
         # NOTE: event functions must return a value that crosses zero when the event occurs
         return time_limit - elapsed_time
@@ -67,7 +67,7 @@ def generate_model_prediction(model, x0, t_eval):
     # this can happen if the model predicts a trajectory that blows up or simply is very stiff
     try:
         ode_result = solve_ivp_with_timeout(model_rhs, t_span, x0, t_eval=t_eval, **solve_ivp_kwargs)
-    except TimeOutError:
+    except TimeoutError:
         print('timeout occurred in solve_ivp_with_timeout')
         return None
     except ValueError:
@@ -94,7 +94,7 @@ def add_noise_to_data(x, noise_level):
     
     # generate appropriate noise by scaling samples from a standard normal
     # NOTE: because "std" is a vector it gets broadcast to the shape of the standard normal noise
-    noise = (std * np.random.standard_normal(x.shape))
+    noise = std * np.random.standard_normal(x.shape)
     
     return x + noise
 
