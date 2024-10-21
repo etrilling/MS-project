@@ -214,7 +214,7 @@ def plot_heatmaps(experiment_config, results):
 
 
 
-def display_single_result(experiment_config, results, col, row, keys_to_display=['x_test', 'x_pred']):
+def display_single_result(experiment_config, results, col, row, keys_to_display=['x_test', 'x_pred', 'x_train_noisy']):
     result = results[row][col]
 
     # print the model for this result

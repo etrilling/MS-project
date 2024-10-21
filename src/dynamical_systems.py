@@ -35,11 +35,11 @@ def generate_true_coefficients(coefficient_info, poly_order, n_frequencies):
 
 
 # generate Lotka-Volterra right-hand side functions
-def generate_lotka_volterra_rhs(a, b, c, d):
+def generate_lotka_volterra_rhs(alpha, beta, gamma, delta):
     def lotka_volterra_rhs(t, x):
         # we expect x to be a 2D array with shape (rows, cols) == (2, n_samples)
         assert x.shape[0] == 2
-        return np.array([a*x[0] - b*x[0]*x[1], -c*x[1] + d*x[0]*x[1]])
+        return np.array([alpha*x[0] - beta*x[0]*x[1], -gamma*x[1] + delta*x[0]*x[1]])
 
     return lotka_volterra_rhs
 
