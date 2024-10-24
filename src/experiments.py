@@ -8,13 +8,17 @@ import seaborn as sns
 
 # define the keys that are allowed in the experiment configuration
 # NOTE: "true_coeffs" is not used in the experiment but having it in the configuration makes generating results easier
-all_keys = ['rhs', 'derivative_approximation', 't_eval_test',
-            'x0', 'noise_level', 't_eval_train', 'dt_train', 't_span_train',
+all_keys = ['rhs', 'derivative_approximation', 't_eval_test', 'np_seed',
+            'x0', 'noise_level',
+            't_eval_train', 'dt_train', 't_span_train', # eval point parameters
+            'train_interpolation_dt',
             'threshold', 'poly_order', 'n_frequencies',
             'true_coeffs']
 
 # define the keys that can change in the experiment configuration
-dynamic_keys = ['x0', 'noise_level', 't_eval_train', 'dt_train', 't_span_train',
+dynamic_keys = ['x0', 'noise_level',
+                't_eval_train', 'dt_train', 't_span_train',
+                'train_interpolation_dt',
                 'threshold', 'poly_order', 'n_frequencies']
 
 
@@ -29,7 +33,8 @@ def run_experiment(experiment_config):
     rhs = experiment_config['rhs']
     derivative_approximation = experiment_config['derivative_approximation']
     t_eval_test = experiment_config['t_eval_test']
-
+    np_seed = experiment_config['np_seed']
+    
     # figure out which two parameters are lists
     list1 = None
     list2 = None
@@ -89,6 +94,7 @@ def run_experiment(experiment_config):
             threshold = result['threshold']
             poly_order = result['poly_order']
             n_frequencies = result['n_frequencies']
+            train_interpolation_dt = result['train_interpolation_dt']
 
             # calculate t_eval_train if it is None
             if t_eval_train is None:
@@ -106,8 +112,14 @@ def run_experiment(experiment_config):
             result["x_train"] = x_train
             
             # generate noisy data
-            x_train_noisy = add_noise_to_data(x_train, noise_level)
+            x_train_noisy = add_noise_to_data(x_train, noise_level, np_seed)
             result["x_train_noisy"] = x_train_noisy
+
+            # THIS IS A TEST! I MIGHT REMOVE THIS!
+            if train_interpolation_dt is not None:
+                eval_pts = np.arange(t_eval_train[0], t_eval_train[-1], train_interpolation_dt)
+                x_train_noisy = lineaer_interp(eval_pts, t_eval_train, x_train_noisy)
+                t_eval_train = eval_pts
 
             # generate a derivative approximation of the noisy data
             x_dot_approx = derivative_approximation(x_train_noisy, t_eval_train)
@@ -230,15 +242,17 @@ def display_single_result(experiment_config, results, col, row, keys_to_display=
         # figure out which time points to use
         if key in ('x_train', 'x_train_noisy', 'x_dot_approx', 'x_dot_true'):
             t_eval = result['t_eval_train']
+            marker = '.-'
         if key in ('x_test', 'x_pred'):
             t_eval = experiment_config['t_eval_test']
+            marker = '-'
         
         # extract the data
         x = result[key]
 
         # plot each state variable
         for sv in range(n_state_vars):
-            axs[sv].plot(t_eval, x[sv], ".-", label=key)
+            axs[sv].plot(t_eval, x[sv], marker, label=key)
 
             # set labels
             axs[sv].set_xlabel("t")

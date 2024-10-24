@@ -82,9 +82,9 @@ def generate_model_prediction(model, x0, t_eval):
 
 
 # generate noisy training data
-def add_noise_to_data(x, noise_level):
+def add_noise_to_data(x, noise_level, seed=0):
     # set random seed for reproducibility
-    np.random.seed(0)
+    np.random.seed(seed)
 
     # calculate the root-mean-square (RMS) value of each state variable
     rms = np.sqrt(np.mean(x**2, axis=1)).reshape((-1, 1))
@@ -111,3 +111,17 @@ def relative_trajectory_error(x_train, x_pred):
 # calculate the relative error between the true and predicted coefficients using the frobenius norm
 def relative_coefficient_error(true_coeffs, pred_coeffs):
     return relative_frobenius_error(true_coeffs, pred_coeffs)
+
+
+# define a function to interpolate the data using linear interpolation in multiple dimensions
+def lineaer_interp(eval_pts, t_eval, x_train):
+    # ensure the evaluation points are within the range of the training data
+    assert min(eval_pts) >= min(t_eval) and max(eval_pts) <= max(t_eval)
+
+    x_interp = np.zeros((x_train.shape[0], len(eval_pts)))
+
+    # for each state variable, interpolate the data
+    for i in range(x_train.shape[0]):
+        x_interp[i] = np.interp(eval_pts, t_eval, x_train[i])
+    
+    return x_interp
