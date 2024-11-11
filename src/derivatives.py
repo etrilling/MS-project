@@ -18,6 +18,9 @@ def dxdt_finite_difference_1d(x, t):
     Returns:
     ndarray: Array of derivative values dx/dt.
     """
+    assert x.ndim == 1
+    assert t.ndim == 1
+
     x = np.asarray(x, dtype=float)
     t = np.asarray(t, dtype=float)
     
@@ -53,6 +56,9 @@ def dxdt_finite_difference(x, t):
     #       see the page "https://numpy.org/doc/stable/reference/generated/numpy.gradient.html" for more information
 
     # we will assume that x.shape == (n_state_vars, n_samples)
+    
+    # make sure x and t have the same number of time points
+    assert x.shape[1] == len(t)
 
     dxdt = np.zeros_like(x)
 
@@ -96,6 +102,9 @@ def dxdt_poly_fit_1d(x, t, poly_deg, window_diameter):
 
 def dxdt_poly_fit(x, t, poly_deg, window_diameter):
     # we will assume that x.shape == (n_state_vars, n_samples)
+    
+    # make sure x and t have the same number of time points
+    assert x.shape[1] == len(t)
 
     dxdt = np.zeros_like(x)
 

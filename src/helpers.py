@@ -24,26 +24,26 @@ class TimeoutError(Exception):
     pass
 
 
-# wrapper around solve_ivp that adds a time limit to the integrationx
-def solve_ivp_with_timeout(fun, t_span, y0, time_limit=10, **kwargs):
-    # Record the start time
+# wrapper around solve_ivp that adds a time limit to the integration
+def solve_ivp_with_timeout(fun, t_span, y0, time_limit=5, **kwargs):
+    # record the start time
     start_time = time.time()
 
-    # Custom event function to check if a time limit is exceeded
-    def time_event(t, y):
+    # custom event function to check if a time limit is exceeded
+    def timeout_event(t, y):
         elapsed_time = time.time() - start_time
 
         if elapsed_time > time_limit:
             raise TimeoutError(f"Time limit of {time_limit} seconds exceeded. Elapsed time: {elapsed_time} seconds.")
         
-        # NOTE: event functions must return a value that crosses zero when the event occurs
+        # NOTE: event functions must return a numeric value (that crosses zero when the event occurs)
         return time_limit - elapsed_time
     
-    # NOTE: these could be used, but they're not needed for my hacky solution of raising an exception
-    # time_event.terminal = True  # Stop integration if the event triggers
-    # time_event.direction = -1   # Detect if the output of time_event goes from positive to negative (crossing zero)
+    # other settings could be used, but they're not needed for my hacky solution of raising an exception
+    # timeout_event.terminal = True  # Stop integration if the event triggers
+    # timeout_event.direction = -1   # Detect if the output of timeout_event goes from positive to negative (crossing zero)
     
-    ode_result = solve_ivp(fun, t_span, y0, **kwargs, events=[time_event])
+    ode_result = solve_ivp(fun, t_span, y0, **kwargs, events=[timeout_event])
 
     return ode_result
 
@@ -69,10 +69,6 @@ def generate_model_prediction(model, x0, t_eval):
         ode_result = solve_ivp_with_timeout(model_rhs, t_span, x0, t_eval=t_eval, **solve_ivp_kwargs)
     except TimeoutError:
         print('timeout occurred in solve_ivp_with_timeout')
-        return None
-    except ValueError:
-        # NOTE: it's possible this only happens for non-LSODA methods
-        raise ValueError('hey Elliot, come check this out!')
         return None
     
     if ode_result.success is False:
@@ -114,14 +110,69 @@ def relative_coefficient_error(true_coeffs, pred_coeffs):
 
 
 # define a function to interpolate the data using linear interpolation in multiple dimensions
-def lineaer_interp(eval_pts, t_eval, x_train):
+def linear_interp(eval_pts, ts, xs):
     # ensure the evaluation points are within the range of the training data
-    assert min(eval_pts) >= min(t_eval) and max(eval_pts) <= max(t_eval)
+    assert min(eval_pts) >= min(ts) and max(eval_pts) <= max(ts)
 
-    x_interp = np.zeros((x_train.shape[0], len(eval_pts)))
+    x_interp = np.zeros((xs.shape[0], len(eval_pts)))
 
     # for each state variable, interpolate the data
-    for i in range(x_train.shape[0]):
-        x_interp[i] = np.interp(eval_pts, t_eval, x_train[i])
+    for i in range(xs.shape[0]):
+        x_interp[i] = np.interp(eval_pts, ts, xs[i])
     
     return x_interp
+
+
+
+# def local_polynomial_interpolation_1d(x, y, eval_points, degree, window_width):
+#     """
+#     Perform local polynomial interpolation on a set of data points.
+
+#     Args:
+#         x (array-like): The x values of the data points.
+#         y (array-like): The y values of the data points.
+#         eval_points (array-like): The points at which the interpolated values are to be evaluated.
+#         degree (int): Degree of the polynomial used for interpolation.
+#         window_width (float): The width of the window (span) for local fitting.
+
+#     Returns:
+#         array: The interpolated values at the evaluation points.
+#     """
+#     n = len(x)
+#     interpolated_values = []
+
+#     # Loop over each evaluation point
+#     for eval_point in eval_points:
+#         # Compute distances from eval_point to all x values
+#         distances = np.abs(x - eval_point)
+        
+#         # Find the data points within the window width
+#         mask = distances <= window_width / 2
+#         local_x = x[mask]
+#         local_y = y[mask]
+        
+#         # If there are enough points for the given degree, fit a polynomial
+#         if len(local_x) > degree:
+#             # Fit a polynomial to the local data
+#             coefficients = np.polyfit(local_x, local_y, degree)
+#             # Evaluate the polynomial at the evaluation point
+#             poly = np.poly1d(coefficients)
+#             interpolated_values.append(poly(eval_point))
+#         else:
+#             # If not enough points, append a NaN or some other default value
+#             interpolated_values.append(np.nan)
+
+#     return np.array(interpolated_values)
+
+
+# def local_polynomial_interpolation(eval_pts, t_eval, x_train, poly_order, window_length):
+#     # ensure the evaluation points are within the range of the training data
+#     assert min(eval_pts) >= min(t_eval) and max(eval_pts) <= max(t_eval)
+
+#     x_interp = np.zeros((x_train.shape[0], len(eval_pts)))
+
+#     # for each state variable, interpolate the data
+#     for i in range(x_train.shape[0]):
+#         x_interp[i] = local_polynomial_interpolation_1d(t_eval, x_train[i], eval_pts, poly_order, window_length)
+    
+#     return x_interp

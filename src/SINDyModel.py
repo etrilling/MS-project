@@ -24,7 +24,7 @@ def make_poly_library(n_state_vars, poly_order):
         library_functions.append(make_poly_function(power_tuple))
 
         # create a name for the library function based on the powers of the state variables
-        function_name = " "
+        function_name = ""
         for i in range(n_state_vars):
             if power_tuple[i] == 0:
                 continue
@@ -37,37 +37,28 @@ def make_poly_library(n_state_vars, poly_order):
         # add the function name to the library names
         library_names.append(function_name)
     
-    library_names[0] = "1" # replace the first name with a constant term (otherwise it will be an empty string)
+    library_names[0] = "1" # replace the first name to make it more clear that it is the constant term
     
     return library_functions, library_names
 
 
 def make_fourier_library(n_state_vars, n_frequencies, include_sin=True, include_cos=True):
-    def make_sin_function(freqs):
-        # here freqs is a tuple of the frequencies of the state variables
-        # but, at most one frequency can be non-zero
-        # e.g. (2, 0) means sin(2 * x0)
-        return lambda x: np.sin(np.multiply(freqs, x))
+    def make_sin_function(freq, i):
+        return lambda x: np.sin(freq*x[i])
 
-    def make_cos_function(freqs):
-        # here freqs is a tuple of the frequencies of the state variables
-        # but, at most one frequency can be non-zero
-        # e.g. (2, 0) means cos(2 * x)
-        return lambda x: np.cos(np.multiply(freqs, x))
+    def make_cos_function(freq, i):
+        return lambda x: np.cos(freq*x[i])
     
     library_functions = []
     library_names = []
     for freq in range(1, n_frequencies + 1): # NOTE: we do not include zero frequency terms
         for i in range(n_state_vars):
-            # create a tuple of frequencies where the ith frequency is non-zero
-            freqs = tuple([0 if j != i else freq for j in range(n_state_vars)])
-
             # add the sin and cos functions to the library
             if include_sin:
-                library_functions.append(make_sin_function(freqs))
+                library_functions.append(make_sin_function(freq, i))
                 library_names.append(f"sin({freq}*x{i})")
             if include_cos:
-                library_functions.append(make_cos_function(freqs))
+                library_functions.append(make_cos_function(freq, i))
                 library_names.append(f"cos({freq}*x{i})")
 
     return library_functions, library_names
@@ -77,16 +68,14 @@ class SINDyModel:
     def __init__(self, n_state_vars, threshold, poly_order=5, n_frequencies=0):
         self.n_state_vars = n_state_vars
         self.threshold = threshold
-        self.poly_order = poly_order
-        self.n_frequencies = n_frequencies
-
+        
         # add functions to the function library
         self.function_library = []
         self.function_library_names = []
-        library_functions, library_names = make_poly_library(self.n_state_vars, self.poly_order)
+        library_functions, library_names = make_poly_library(self.n_state_vars, poly_order)
         self.function_library += library_functions
         self.function_library_names += library_names
-        library_functions, library_names = make_fourier_library(self.n_state_vars, self.n_frequencies)
+        library_functions, library_names = make_fourier_library(self.n_state_vars, n_frequencies)
         self.function_library += library_functions
         self.function_library_names += library_names
 
