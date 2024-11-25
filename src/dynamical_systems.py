@@ -99,9 +99,9 @@ def generate_nonlinear_pendulum_rhs(omega):
         return np.array([x[1], -omega**2 * np.sin(x[0])])
     return rhs
 
-def generate_nonlinear_pendulum_true_coefficients(omega, poly_order=0, n_frequencies=5):
+def generate_nonlinear_pendulum_true_coefficients(omega, poly_order=1, n_frequencies=5):
     coefficient_info = [{'x1': 1}, # RHS for first state variable
-                        {'sin(x1)': -omega**2}] # RHS for second state variable
+                        {'sin(1*x1)': -omega**2}] # RHS for second state variable
 
     true_coefficients = generate_true_coefficients(coefficient_info, poly_order, n_frequencies)
     return true_coefficients

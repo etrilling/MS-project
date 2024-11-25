@@ -44,10 +44,10 @@ def make_poly_library(n_state_vars, poly_order):
 
 def make_fourier_library(n_state_vars, n_frequencies, include_sin=True, include_cos=True):
     def make_sin_function(freq, i):
-        return lambda x: np.sin(freq*x[i])
+        return lambda x: np.sin(freq*x[:, i])
 
     def make_cos_function(freq, i):
-        return lambda x: np.cos(freq*x[i])
+        return lambda x: np.cos(freq*x[:, i])
     
     library_functions = []
     library_names = []
@@ -114,6 +114,10 @@ class SINDyModel:
                 big_inds = ~small_inds[:, i]
                 # compute least squares
                 Xi[big_inds, i] = np.linalg.lstsq(Theta[:, big_inds], x_dot[:, i], rcond=None)[0]
+
+                # NOTE: the following code is an alternative to the above line
+                # from sklearn.linear_model import ridge_regression
+                # Xi[big_inds, i] = ridge_regression(Theta[:, big_inds], x_dot[:, i], alpha=0.05)
         else:
             raise RuntimeError("STLSQ did not converge in the maximum number of itterations")
 

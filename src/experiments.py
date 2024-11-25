@@ -2,6 +2,7 @@ from src.helpers import *
 from src.SINDyModel import SINDyModel
 from src.ESINDyModel import ESINDyModel
 from src.dynamical_systems import *
+from src.derivatives import *
 
 from tqdm import tqdm
 from matplotlib import pyplot as plt
@@ -19,6 +20,20 @@ dynamic_keys = ['x0', 'noise_level',
                 'threshold', 'poly_order', 'n_frequencies']
 
 
+def extract_list_items(experiment_config):
+    list_kv_pairs = list(filter(lambda kv_pair: type(kv_pair[1]) is list, experiment_config.items()))
+    
+    if len(list_kv_pairs) != 2:
+        raise ValueError("You need to specify two lists in the experiment configuration")
+    
+    list1_name = list_kv_pairs[0][0]
+    list1 = list_kv_pairs[0][1]
+    list2_name = list_kv_pairs[1][0]
+    list2 = list_kv_pairs[1][1]
+
+    return list1_name, list1, list2_name, list2
+
+
 def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True):
     # NOTE: the order of the keys in "experiment_config" is important.
     #       the first list present will be the rows and the second list will be the columns
@@ -33,24 +48,9 @@ def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True
     np_seed = experiment_config['np_seed']
     
     # figure out which two parameters are lists
-    list1 = None
-    list2 = None
-    for key in experiment_config.keys():
-        if type(experiment_config[key]) is not list:
-            continue
-
-        if list1 is None:
-            list1 = experiment_config[key]
-            print(f'rows are {key}. there are {len(list1)} rows.')
-        elif list2 is None:
-            list2 = experiment_config[key]
-            print(f'columns are {key}. there are {len(list2)} columns.')
-        else:
-            raise ValueError("Only two lists are allowed")
-    
-    # make sure we found two lists
-    if list1 is None or list2 is None:
-        raise ValueError("You need to specify two lists in the experiment configuration")
+    list1_name, list1, list2_name, list2 = extract_list_items(experiment_config)
+    print(f'rows are {list1_name}. there are {len(list1)} rows.')
+    print(f'columns are {list2_name}. there are {len(list2)} columns.')
 
     # make a results matrix
     # the first list (list1) will decide be the number of rows and
@@ -133,6 +133,7 @@ def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True
                                    poly_order=poly_order, n_frequencies=n_frequencies)
             model.fit(x_train_noisy, x_dot_approx)
             result["model"] = model
+            result["model_xi"] = model.Xi
 
             if generate_prediction:
                 # generate the model prediction on the test data
@@ -153,32 +154,31 @@ def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True
 #     list_of_results = []
 
 #     for i in range(n_repeats):
-#         print(f"Repeat {i + 1} of {n_repeats}")
+#         print('*'*20 + f'repeat {i + 1} of {n_repeats}' + '*'*20)
 #         results = run_experiment(experiment_config, generate_prediction)
-
 #         list_of_results.append(results)
+    
+#     list_1_len = len(list_of_results[0])
+#     list_2_len = len(list_of_results[0][0])
+#     avg_results = [[{} for _ in range(list_2_len)] for _ in range(list_1_len)]
+
+#     for i in range(n_repeats):
+#         for j in range(list_1_len):
+#             for k in range(list_2_len):
+#                 if avg_results[j][k] is None:
+#                     avg_results[j][k]['model_xi'] = list_of_results[i][j][k]['model_xi']
+#                     avg_results[j][k]['t'] = list_of_results[i][j][k]['x_train']
+#                 else:
+#                     avg_results[j][k] += list_of_results[i][j][k]
+
+
+
 
 
 def plot_heatmaps(experiment_config, results):
-    # figure out which parameters are lists
-    list1 = None
-    list1_name = None
-    list2 = None
-    list2_name = None
-    for key in experiment_config.keys():
-        if type(experiment_config[key]) is not list:
-            continue
-
-        if list1 is None:
-            list1 = experiment_config[key]
-            list1_name = key
-            print(f'rows are {key}. there are {len(list1)} rows.')
-        elif list2 is None:
-            list2 = experiment_config[key]
-            list2_name = key
-            print(f'columns are {key}. there are {len(list2)} columns.')
-        else:
-            raise ValueError("Only two lists are allowed")
+    list1_name, list1, list2_name, list2 = extract_list_items(experiment_config)
+    print(f'rows are {list1_name}. there are {len(list1)} rows.')
+    print(f'columns are {list2_name}. there are {len(list2)} columns.')
     
     # flip the rows of the results so the smallest value is at the bottom of the heatmap
     results = results[::-1]
@@ -197,12 +197,12 @@ def plot_heatmaps(experiment_config, results):
     correct_system_mtx = np.zeros((len(list1), len(list2)))
     for i in range(len(list1)):
         for j in range(len(list2)):
-            model = results[i][j]["model"]
-            rce = relative_coefficient_error(true_coeffs, model.Xi)
+            model_xi = results[i][j]["model_xi"]
+            rce = relative_coefficient_error(true_coeffs, model_xi)
             rce_mtx[i, j] = rce
 
             # if the predicted model has the same non-zero coefficients as the true model, set this to 1
-            correct_system_mtx[i, j] = np.array_equal(np.nonzero(model.Xi), np.nonzero(true_coeffs))
+            correct_system_mtx[i, j] = np.array_equal(np.nonzero(model_xi), np.nonzero(true_coeffs))
 
     # make a matrix of the relative trajectory errors
     rte_mtx = np.zeros((len(list1), len(list2)))
@@ -280,52 +280,69 @@ def display_single_result(experiment_config, results, col, row, keys_to_display=
 
 
 
-def run_test_suite(experiment_config, generate_prediction=True):
-    # TODO: you'd need to change the library functions for the pendulum
+def run_test_suite(test_suite_config, use_ESINDy, generate_prediction):
+    list_of_system_info = [
+        ('lotka_volterra',
+         generate_lotka_volterra_rhs(*default_params['lotka_volterra']),
+         generate_lotka_volterra_true_coefficients(*default_params['lotka_volterra']),
+         default_x0['lotka_volterra']),
 
-    list_of_rhs = [
-        generate_lotka_volterra_rhs(*default_params['lotka_volterra']),
+        ('van_der_pol_oscillator',
         generate_van_der_pol_oscillator_rhs(*default_params['van_der_pol_oscillator']),
-        generate_duffing_oscillator_rhs(*default_params['duffing_oscillator']),
-        generate_nonlinear_pendulum_rhs(*default_params['nonlinear_pendulum']),
-        generate_lorenz_rhs(*default_params['lorenz'])
-    ]
-    
-    list_of_true_coeffs = [
-        generate_lotka_volterra_true_coefficients(*default_params['lotka_volterra']),
         generate_van_der_pol_oscillator_true_coefficients(*default_params['van_der_pol_oscillator']),
+        default_x0['van_der_pol_oscillator']),
+
+        ('duffing_oscillator',
+        generate_duffing_oscillator_rhs(*default_params['duffing_oscillator']),
         generate_duffing_oscillator_true_coefficients(*default_params['duffing_oscillator']),
+        default_x0['duffing_oscillator']),
+
+        ('nonlinear_pendulum',
+        generate_nonlinear_pendulum_rhs(*default_params['nonlinear_pendulum']),
         generate_nonlinear_pendulum_true_coefficients(*default_params['nonlinear_pendulum']),
-        generate_lorenz_true_coefficients(*default_params['lorenz'])
-    ]
-    
-    list_of_x0 = [
-        default_x0['lotka_volterra'],
-        default_x0['van_der_pol_oscillator'],
-        default_x0['duffing_oscillator'],
-        default_x0['nonlinear_pendulum'],
-        default_x0['lorenz']
-    ]
-    
-    list_of_system_names = [
-        'Lotka-Volterra',
-        'Van der Pol Oscillator',
-        'Duffing Oscillator',
-        'Nonlinear Pendulum',
-        'Lorenz System'
+        default_x0['nonlinear_pendulum']),
+
+        ('lorenz',
+        generate_lorenz_rhs(*default_params['lorenz']),
+        generate_lorenz_true_coefficients(*default_params['lorenz']),
+        default_x0['lorenz'])   
     ]
 
     list_of_results = []
-    for rhs, true_coeffs, x0, system_name in zip(list_of_rhs, list_of_true_coeffs, list_of_x0, list_of_system_names):
-        experiment_config['rhs'] = rhs
-        experiment_config['true_coeffs'] = true_coeffs
-        experiment_config['x0'] = x0
+    list_of_experiment_configs = []
 
-        results = run_experiment(experiment_config, generate_prediction)
-        list_of_results.append(results)
+    for system_name, rhs, true_coeffs, x0 in list_of_system_info:
+        experiment_config = {
+            # define fixed parameters
+            'rhs': rhs,
+            'derivative_approximation': dxdt_finite_difference,
+            'np_seed': 0,
+            'true_coeffs': true_coeffs,
+            # define parameters that can be lists
+            'x0': x0,
+            't_eval_train': None,
+            'train_interpolation_dt': None,
+            'threshold': 0.05
+        }
+
+        if system_name == 'nonlinear_pendulum':
+            experiment_config['poly_order'] = 1
+            experiment_config['n_frequencies'] = 5
+        else:
+            experiment_config['poly_order'] = 5
+            experiment_config['n_frequencies'] = 0
+        
+        keys = ['t_eval_test', 'noise_level',  'dt_train', 't_span_train']
+        for key in keys:
+            experiment_config[key] = test_suite_config[system_name][key]
+        
+        list_of_experiment_configs.append(experiment_config)
 
         print('*'*30 + system_name + '*'*30)
+        results = run_experiment(experiment_config, use_ESINDy, generate_prediction)
+        list_of_results.append(results)
+
         plot_heatmaps(experiment_config, results)
     
 
-    return list_of_results
+    return list_of_results, list_of_experiment_configs
