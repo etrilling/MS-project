@@ -1,5 +1,6 @@
 from src.helpers import *
 from src.SINDyModel import SINDyModel
+from src.ESINDyModel import ESINDyModel
 from src.dynamical_systems import *
 
 from tqdm import tqdm
@@ -18,7 +19,7 @@ dynamic_keys = ['x0', 'noise_level',
                 'threshold', 'poly_order', 'n_frequencies']
 
 
-def run_experiment(experiment_config, generate_prediction=True):
+def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True):
     # NOTE: the order of the keys in "experiment_config" is important.
     #       the first list present will be the rows and the second list will be the columns
 
@@ -124,8 +125,12 @@ def run_experiment(experiment_config, generate_prediction=True):
             result["x_dot_true"] = x_dot_true
             
             # create and fit a SINDy model
-            model = SINDyModel(n_state_vars=len(x0), threshold=threshold,
-                               poly_order=poly_order, n_frequencies=n_frequencies)
+            if use_ESINDy:
+                model = ESINDyModel(n_state_vars=len(x0), threshold=threshold,
+                                    poly_order=poly_order, n_frequencies=n_frequencies)
+            else:
+                model = SINDyModel(n_state_vars=len(x0), threshold=threshold,
+                                   poly_order=poly_order, n_frequencies=n_frequencies)
             model.fit(x_train_noisy, x_dot_approx)
             result["model"] = model
 
@@ -143,6 +148,15 @@ def run_experiment(experiment_config, generate_prediction=True):
 
     return results
 
+
+# def run_experiment_multiple_times(experiment_config, n_repeats, generate_prediction=True):
+#     list_of_results = []
+
+#     for i in range(n_repeats):
+#         print(f"Repeat {i + 1} of {n_repeats}")
+#         results = run_experiment(experiment_config, generate_prediction)
+
+#         list_of_results.append(results)
 
 
 def plot_heatmaps(experiment_config, results):
@@ -178,13 +192,17 @@ def plot_heatmaps(experiment_config, results):
     # extract the true coefficients from the experiment configuration
     true_coeffs = experiment_config['true_coeffs']
 
-    # make a matrix of the relative coefficient errors
+    # make a matrix of the relative coefficient errors and keep track of the correct systems
     rce_mtx = np.zeros((len(list1), len(list2)))
+    correct_system_mtx = np.zeros((len(list1), len(list2)))
     for i in range(len(list1)):
         for j in range(len(list2)):
             model = results[i][j]["model"]
             rce = relative_coefficient_error(true_coeffs, model.Xi)
             rce_mtx[i, j] = rce
+
+            # if the predicted model has the same non-zero coefficients as the true model, set this to 1
+            correct_system_mtx[i, j] = np.array_equal(np.nonzero(model.Xi), np.nonzero(true_coeffs))
 
     # make a matrix of the relative trajectory errors
     rte_mtx = np.zeros((len(list1), len(list2)))
@@ -207,10 +225,20 @@ def plot_heatmaps(experiment_config, results):
     fig = plt.figure(figsize=(8, 6))
     ax = sns.heatmap(rce_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
     ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Coefficient Error")
+    # overlay the incorrect systems in red
+    for i in range(len(list1)):
+        for j in range(len(list2)):
+            if correct_system_mtx[i, j] == False:
+                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
 
     fig = plt.figure(figsize=(8, 6))
     ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
     ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Trajectory Error")
+    # overlay the incorrect systems in red
+    for i in range(len(list1)):
+        for j in range(len(list2)):
+            if correct_system_mtx[i, j] == False:
+                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
 
     plt.show()
 
