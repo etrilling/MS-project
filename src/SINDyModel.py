@@ -8,6 +8,10 @@ def make_poly_library(n_state_vars, poly_order):
         # e.g. (1, 2) means x0^1 * x1^2
         return lambda x: np.prod(np.power(x, power_tuple), axis=1)
     
+    # if poly_order is -1, we should return an empty library
+    if poly_order == -1:
+        return [], []
+    
     # get all possible power tuples up to poly_order
     # this should be sorted so that all n-th order terms come before all (n+1)-th order terms
     # and within each order, the terms are sorted lexicographically by the power of the state variables

@@ -230,15 +230,17 @@ def plot_heatmaps(experiment_config, results):
         for j in range(len(list2)):
             if correct_system_mtx[i, j] == False:
                 ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
-
-    fig = plt.figure(figsize=(8, 6))
-    ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
-    ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Trajectory Error")
-    # overlay the incorrect systems in red
-    for i in range(len(list1)):
-        for j in range(len(list2)):
-            if correct_system_mtx[i, j] == False:
-                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
+    
+    # only draw the RTE plot if there are predictions
+    if not np.all(np.isnan(rte_mtx)):
+        fig = plt.figure(figsize=(8, 6))
+        ax = sns.heatmap(rte_mtx, annot=True, xticklabels=xticklabels, yticklabels=yticklabels, vmin=0, vmax=1)
+        ax.set(xlabel=list2_name, ylabel=list1_name, title="Relative Trajectory Error")
+        # overlay the incorrect systems in red
+        for i in range(len(list1)):
+            for j in range(len(list2)):
+                if correct_system_mtx[i, j] == False:
+                    ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
 
     plt.show()
 

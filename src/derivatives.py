@@ -69,6 +69,30 @@ def dxdt_finite_difference(x, t):
 
 
 
+# def dxdt_es_finite_difference_1d(x, t):
+#     assert x.ndim == 1
+#     assert t.ndim == 1
+#     assert x.shape == t.shape
+
+#     dxdt = np.zeros_like(x)
+#     dxdt[0] = (x[1] - x[0]) / (t[1] - t[0])
+#     dxdt[1:-1] = (x[2:] - x[:-2]) / (t[2:] - t[:-2])
+#     dxdt[-1] = (x[-1] - x[-2]) / (t[-1] - t[-2])
+#     return dxdt
+
+
+# def dxdt_es_finite_difference(x, t):
+#     assert x.shape[1] == len(t)
+
+#     dxdt = np.zeros_like(x)
+
+#     for i in range(x.shape[0]):
+#         dxdt[i] = dxdt_es_finite_difference_1d(x[i], t)
+    
+#     return dxdt
+
+
+
 def dxdt_poly_fit_1d(x, t, poly_deg, window_diameter):
     # NOTE: this gives exactly the same result as
     #       "dxdt(x, t, kind="savitzky_golay", left=window_diameter, right=window_diameter, order=poly_deg, iwindow=True)"
