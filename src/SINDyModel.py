@@ -1,6 +1,10 @@
 import numpy as np
 import itertools
+from sklearn.linear_model import ridge_regression
+from scipy.linalg import LinAlgWarning
+import warnings
 
+warnings.filterwarnings(action='ignore', category=LinAlgWarning, module='sklearn')
 
 def make_poly_library(n_state_vars, poly_order):
     def make_poly_function(power_tuple):
@@ -69,9 +73,10 @@ def make_fourier_library(n_state_vars, n_frequencies, include_sin=True, include_
 
 
 class SINDyModel:
-    def __init__(self, n_state_vars, threshold, poly_order=5, n_frequencies=0):
+    def __init__(self, n_state_vars, threshold, poly_order=5, n_frequencies=0, use_ridge=False):
         self.n_state_vars = n_state_vars
         self.threshold = threshold
+        self.use_ridge = use_ridge
         
         # add functions to the function library
         self.function_library = []
@@ -96,8 +101,12 @@ class SINDyModel:
         
         Theta = np.column_stack([f(x) for f in self.function_library])
 
-        Xi = np.linalg.lstsq(Theta, x_dot, rcond=None)[0]
-
+        if self.use_ridge:
+            # compute least squares with ridge regression
+            Xi = ridge_regression(Theta, x_dot, alpha=0.05).T
+        else:
+            Xi = np.linalg.lstsq(Theta, x_dot, rcond=None)[0]
+        
         # repeat STLSQ multiple times
         for _ in range(max_itterations):
             # get indices of small coefficients
@@ -116,12 +125,17 @@ class SINDyModel:
             for i in range(x.shape[1]):
                 # get the indices of the non-zero coefficients for this state variable
                 big_inds = ~small_inds[:, i]
-                # compute least squares
-                Xi[big_inds, i] = np.linalg.lstsq(Theta[:, big_inds], x_dot[:, i], rcond=None)[0]
 
-                # NOTE: the following code is an alternative to the above line
-                # from sklearn.linear_model import ridge_regression
-                # Xi[big_inds, i] = ridge_regression(Theta[:, big_inds], x_dot[:, i], alpha=0.05)
+                # if there are no non-zero coefficients for this state variable, skip it
+                if not np.any(big_inds):
+                    continue
+
+                if self.use_ridge:
+                    # compute least squares with ridge regression
+                    Xi[big_inds, i] = ridge_regression(Theta[:, big_inds], x_dot[:, i], alpha=0.05).T
+                else:
+                    # compute least squares
+                    Xi[big_inds, i] = np.linalg.lstsq(Theta[:, big_inds], x_dot[:, i], rcond=None)[0]
         else:
             raise RuntimeError("STLSQ did not converge in the maximum number of itterations")
 

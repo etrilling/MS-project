@@ -34,7 +34,7 @@ def extract_list_items(experiment_config):
     return list1_name, list1, list2_name, list2
 
 
-def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True):
+def run_experiment(experiment_config, use_ESINDy=False, use_ridge=False, generate_prediction=True):
     # NOTE: the order of the keys in "experiment_config" is important.
     #       the first list present will be the rows and the second list will be the columns
 
@@ -127,10 +127,10 @@ def run_experiment(experiment_config, use_ESINDy=False, generate_prediction=True
             # create and fit a SINDy model
             if use_ESINDy:
                 model = ESINDyModel(n_state_vars=len(x0), threshold=threshold,
-                                    poly_order=poly_order, n_frequencies=n_frequencies)
+                                    poly_order=poly_order, n_frequencies=n_frequencies, use_ridge=use_ridge)
             else:
                 model = SINDyModel(n_state_vars=len(x0), threshold=threshold,
-                                   poly_order=poly_order, n_frequencies=n_frequencies)
+                                   poly_order=poly_order, n_frequencies=n_frequencies, use_ridge=use_ridge)
             model.fit(x_train_noisy, x_dot_approx)
             result["model"] = model
             result["model_xi"] = model.Xi
@@ -228,8 +228,8 @@ def plot_heatmaps(experiment_config, results):
     # overlay the incorrect systems in red
     for i in range(len(list1)):
         for j in range(len(list2)):
-            if correct_system_mtx[i, j] == False:
-                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
+            if correct_system_mtx[i, j] == True:
+                ax.add_patch(plt.Rectangle((j + 0.1, i + 0.1), 0.8, 0.8, fill=False, edgecolor='green', lw=1))
     
     # only draw the RTE plot if there are predictions
     if not np.all(np.isnan(rte_mtx)):
@@ -239,8 +239,8 @@ def plot_heatmaps(experiment_config, results):
         # overlay the incorrect systems in red
         for i in range(len(list1)):
             for j in range(len(list2)):
-                if correct_system_mtx[i, j] == False:
-                    ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=False, edgecolor='blue', lw=1))
+                if correct_system_mtx[i, j] == True:
+                    ax.add_patch(plt.Rectangle((j + 0.1, i + 0.1), 0.8, 0.8, fill=False, edgecolor='green', lw=1))
 
     plt.show()
 
@@ -282,7 +282,7 @@ def display_single_result(experiment_config, results, col, row, keys_to_display=
 
 
 
-def run_test_suite(test_suite_config, use_ESINDy, generate_prediction):
+def run_test_suite(test_suite_config, use_ESINDy, use_ridge, generate_prediction):
     list_of_system_info = [
         ('lotka_volterra',
          generate_lotka_volterra_rhs(*default_params['lotka_volterra']),
@@ -341,7 +341,7 @@ def run_test_suite(test_suite_config, use_ESINDy, generate_prediction):
         list_of_experiment_configs.append(experiment_config)
 
         print('*'*30 + system_name + '*'*30)
-        results = run_experiment(experiment_config, use_ESINDy, generate_prediction)
+        results = run_experiment(experiment_config, use_ESINDy, use_ridge, generate_prediction)
         list_of_results.append(results)
 
         plot_heatmaps(experiment_config, results)

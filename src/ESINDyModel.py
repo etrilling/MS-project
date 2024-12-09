@@ -1,17 +1,18 @@
 from src.SINDyModel import *
 
 class ESINDyModel:
-    def __init__(self, n_state_vars, threshold, inclusion_threshold=0.6, poly_order=5, n_frequencies=0):
+    def __init__(self, n_state_vars, threshold, inclusion_threshold=0.6, poly_order=5, n_frequencies=0, use_ridge=False):
         self.n_state_vars = n_state_vars
         self.threshold = threshold
         self.inclusion_threshold = inclusion_threshold
         self.poly_order = poly_order
         self.n_freq = n_frequencies
+        self.use_ridge = use_ridge
     
     def fit(self, x, x_dot, n_bootstraps=100, seed=0):
         n_samples = x.shape[1]
         
-        Xis = []
+        self.Xis = []
 
         np.random.seed(seed)
 
@@ -22,18 +23,18 @@ class ESINDyModel:
             x_dot_subset = x_dot[:, indices]
 
             # create the SINDy model
-            sindy_model = SINDyModel(self.n_state_vars, self.threshold, self.poly_order, self.n_freq)
+            sindy_model = SINDyModel(self.n_state_vars, self.threshold, self.poly_order, self.n_freq, self.use_ridge)
             sindy_model.fit(x_subset, x_dot_subset)
 
-            Xis.append(sindy_model.Xi)
+            self.Xis.append(sindy_model.Xi)
         
         # convert the list of Xi arrays to a 3D array
         # it's shape will be (n_bootstraps, n_features, n_state_vars)
-        Xis = np.array(Xis)
+        self.Xis = np.array(self.Xis)
 
-        ip = np.mean(Xis != 0, axis=0)
+        ip = np.mean(self.Xis != 0, axis=0)
         
-        Xi_agg = np.median(Xis, axis=0)
+        Xi_agg = np.median(self.Xis, axis=0)
 
         # set the Xi values to zero if the inclusion probability is below the threshold
         Xi_agg[ip < self.inclusion_threshold] = 0

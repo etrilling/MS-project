@@ -1,7 +1,10 @@
 import numpy as np
 from scipy.integrate import solve_ivp
 import time
+import warnings
 
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 # set global solve_ivp keyword arguments
 # NOTES
